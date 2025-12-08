@@ -3,6 +3,10 @@ import torch.nn as nn
 
 from transformers import CLIPVisionModel, CLIPImageProcessor, CLIPVisionConfig
 
+from llava.model.vision.spatial_sinusoidal import (
+    add_2d_sinusoidal_spatial_embedding,
+)
+
 
 class CLIPVisionTower(nn.Module):
     def __init__(self, vision_tower, args, delay_load=False):
@@ -13,6 +17,8 @@ class CLIPVisionTower(nn.Module):
         self.vision_tower_name = vision_tower
         self.select_layer = args.mm_vision_select_layer
         self.select_feature = getattr(args, 'mm_vision_select_feature', 'patch')
+        self.use_spatial_embedding = getattr(args, 'use_spatial_embedding', False)
+        self.spatial_alpha = getattr(args, 'spatial_alpha', 0.1)
 
         if not delay_load:
             self.load_model()
@@ -41,6 +47,20 @@ class CLIPVisionTower(nn.Module):
         else:
             raise ValueError(f'Unexpected select feature: {self.select_feature}')
         return image_features
+    
+    def _maybe_add_spatial_embedding(self, image_features: torch.Tensor) -> torch.Tensor:
+        if not self.use_spatial_embedding:
+            return image_features
+
+        num_tokens = image_features.shape[-2]
+        grid_side = int(num_tokens ** 0.5)
+        if grid_side * grid_side != num_tokens:
+            return image_features
+
+        grid_size = (grid_side, grid_side)
+        return add_2d_sinusoidal_spatial_embedding(
+            image_features, grid_size=grid_size, alpha=self.spatial_alpha
+        )
 
     @torch.no_grad()
     def forward(self, images):
@@ -49,11 +69,13 @@ class CLIPVisionTower(nn.Module):
             for image in images:
                 image_forward_out = self.vision_tower(image.to(device=self.device, dtype=self.dtype).unsqueeze(0), output_hidden_states=True)
                 image_feature = self.feature_select(image_forward_out).to(image.dtype)
+                image_feature = self._maybe_add_spatial_embedding(image_feature)
                 image_features.append(image_feature)
         else:
             # print("encoder", self.device, self.vision_tower.device)
             image_forward_outs = self.vision_tower(images.to(device=self.device, dtype=self.dtype), output_hidden_states=True)
             image_features = self.feature_select(image_forward_outs).to(images.dtype)
+            image_features = self._maybe_add_spatial_embedding(image_features)
 
         return image_features
 

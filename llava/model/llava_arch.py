@@ -73,7 +73,9 @@ class LlavaMetaModel:
         self.config.mm_vision_select_layer = mm_vision_select_layer
         self.config.mm_vision_select_feature = mm_vision_select_feature
         self.config.mm_patch_merge_type = mm_patch_merge_type
-
+        self.config.use_spatial_embedding = getattr(model_args, 'use_spatial_embedding', False)
+        self.config.spatial_alpha = getattr(model_args, 'spatial_alpha', 0.1)
+        
         if getattr(self, 'mm_projector', None) is None:
             self.mm_projector = build_vision_projector(self.config)
 

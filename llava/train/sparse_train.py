@@ -67,7 +67,8 @@ class ModelArguments:
     mm_vision_select_feature: Optional[str] = field(default="patch")
     s2: bool = field(default=False)
     s2_scales: Optional[str] = field(default="336,672,1008")
-
+    use_spatial_embedding: bool = field(default=False)
+    spatial_alpha: float = field(default=0.1)
 
 @dataclass
 class DataArguments:

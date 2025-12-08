@@ -67,6 +67,8 @@ class ModelArguments:
     s2: bool = field(default=False)
     s2_scales: Optional[str] = field(default="336,672,1008")
     s2_manner: Optional[str] = field(default="token")
+    use_spatial_embedding: bool = field(default=False)
+    spatial_alpha: float = field(default=0.1)
 
 
 @dataclass
