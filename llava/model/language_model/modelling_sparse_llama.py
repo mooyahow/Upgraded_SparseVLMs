@@ -93,15 +93,40 @@ class LlamaDynamicvitModel(LlamaModel):
         self._use_flash_attention_2 = config._attn_implementation == "flash_attention_2"
         self.norm = LlamaRMSNorm(config.hidden_size, eps=config.rms_norm_eps)
 
+        self.rater_threshold_mode = getattr(config, "rater_threshold_mode", "mean")
+        self.rater_top_pct = getattr(config, "rater_top_pct", 0.25)
+
         self.gradient_checkpointing = False
         self.all_FLOPs = 0
         # Initialize weights and apply final processing
         self.post_init()
-        
+
+    def _compute_rater_threshold(self, scores: torch.Tensor) -> torch.Tensor:
+        mode = getattr(self, "rater_threshold_mode", "mean")
+        top_pct = getattr(self, "rater_top_pct", 0.25)
+
+        if mode == "top_pct":
+            quantile = 1.0 - top_pct
+            if hasattr(torch, "quantile"):
+                if scores.dim() == 1:
+                    threshold = torch.quantile(scores, quantile)
+                else:
+                    threshold = torch.quantile(scores, quantile, dim=-1, keepdim=True)
+            else:
+                n = scores.shape[-1]
+                k = max(1, math.ceil(top_pct * n))
+                threshold = scores.topk(k, dim=-1).values[..., -1:]
+                if scores.dim() == 1:
+                    threshold = threshold.squeeze(-1)
+        else:
+            threshold = scores.mean(dim=-1, keepdim=True) if scores.dim() > 1 else scores.mean()
+
+        return threshold
+
     def forward(
         self,
         input_ids: torch.LongTensor = None,
-        attention_mask: Optional[torch.Tensor] = None,  # torch.size([1,668]) 
+        attention_mask: Optional[torch.Tensor] = None,  # torch.size([1,668])
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[List[torch.FloatTensor]] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
@@ -201,7 +226,8 @@ class LlamaDynamicvitModel(LlamaModel):
             t_t = hidden_states[:, text_token_start: , :]
             m_v_t = v_t @ t_t.transpose(1, 2) # [1, 576, 53]
             m_v_t = m_v_t.softmax(2).mean(1) # [1, 53]
-            t_token_idx = torch.where(m_v_t > m_v_t.mean())
+            threshold = self._compute_rater_threshold(m_v_t)
+            t_token_idx = torch.where(m_v_t >= threshold)
 
             num_token = []
 
