@@ -22,3 +22,22 @@
   - Added **spatial embeddings**.
   - Modified **rater selection thresholds**.
 
+## License & Attribution
+
+This repository builds on upstream open-source projects, including:
+
+- **SparseVLM**: https://github.com/Gumpest/SparseVLMs  
+- **LLaVA (v1.5)**: https://github.com/haotian-liu/LLaVA
+
+All upstream copyright notices, license texts, and attribution requirements are respected and preserved. Please refer to
+each upstream repository for its applicable license and terms.
+
+### This Repository
+The code and original modifications in this repository are licensed under the terms described in the `LICENSE` file
+at the root of this repository. Unless explicitly stated otherwise, upstream components remain subject to their original
+licenses and are not relicensed by this project.
+
+### Redistribution Notice
+This repository includes only our additional modifications and does **not** redistribute upstream datasets, model
+weights, or proprietary evaluation assets. Evaluation artifacts are intentionally excluded; please follow the upstream
+(LLaVA v1.5) evaluation guidelines when running benchmarks.
